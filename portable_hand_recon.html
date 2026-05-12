@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AnatomiX Pro - Portable Hand Recon</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0A0A0A;
+            color: #E2E8F0;
+            overflow: hidden;
+            margin: 0;
+            height: 100vh;
+        }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        
+        /* Skeleton Glow Animation */
+        @keyframes joint-pulse {
+            0% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(1); opacity: 0.8; }
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen">
+
+    <!-- Header -->
+    <header class="h-16 border-b border-white/10 bg-[#111111] px-6 flex items-center justify-between sticky top-0 z-50">
+        <div class="flex items-center gap-4">
+            <div class="w-8 h-8 bg-blue-900 rounded flex items-center justify-center font-bold text-white shadow-lg shadow-blue-900/20">
+                A
+            </div>
+            <h1 class="text-lg font-medium tracking-tight">AnatomiX <span class="text-blue-500 font-normal">Pro Studio</span></h1>
+        </div>
+
+        <div class="flex items-center gap-6">
+            <div class="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10">
+                <div id="status-dot" class="w-2 h-2 rounded-full bg-gray-600"></div>
+                <span id="status-text" class="text-[10px] text-gray-400 font-mono uppercase tracking-wider">System Standby</span>
+            </div>
+            <div class="hidden sm:flex items-center gap-2 text-gray-500 text-[10px] font-mono tracking-widest uppercase bg-white/5 px-3 py-1 rounded border border-white/5">
+                <span id="fps-counter">0</span> FPS
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
+        
+        <!-- Center Viewport -->
+        <div class="lg:col-span-8 flex flex-col p-8 gap-6 overflow-hidden">
+            <div class="relative flex-1 bg-[#0D0D0D] rounded-lg border border-white/10 overflow-hidden shadow-2xl group min-h-[400px]">
+                <video id="input-video" class="hidden" playsinline></video>
+                <canvas id="output-canvas" class="w-full h-full object-contain scale-x-[-1]"></video>
+                
+                <!-- Initialization Overlay -->
+                <div id="init-overlay" class="absolute inset-0 z-40 bg-[#0A0A0A]/95 flex flex-col items-center justify-center p-8 text-center text-gray-200">
+                    <div class="w-24 h-24 bg-blue-900/10 border border-blue-900/40 rounded-full flex items-center justify-center text-blue-500 mb-8 relative">
+                        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    </div>
+                    <h2 class="text-3xl font-medium mb-3 tracking-tight">AnatomiX Portable</h2>
+                    <p class="text-gray-500 max-w-sm text-sm mb-10 leading-relaxed font-light">Standalone Vision System. All processing is 100% local on your browser.</p>
+                    <button id="btn-start" class="px-10 py-3 bg-blue-900 hover:bg-blue-800 text-white text-xs font-bold rounded uppercase tracking-[0.2em] transition-all transform hover:scale-105 active:scale-95 shadow-2xl shadow-blue-900/40 border border-blue-500/30">
+                        Launch Core Feed
+                    </button>
+                </div>
+
+                <!-- HUD -->
+                <div id="gesture-hud" class="absolute inset-x-0 bottom-8 flex justify-center z-30 opacity-0 transition-opacity">
+                    <div class="bg-black/80 backdrop-blur-md border border-white/10 rounded-lg p-1 flex gap-4 pr-6 shadow-2xl">
+                        <div id="hud-emoji" class="w-14 h-14 bg-blue-900/40 rounded flex items-center justify-center text-3xl">✋</div>
+                        <div class="flex flex-col justify-center">
+                            <span class="text-[9px] text-blue-500 font-mono font-bold uppercase tracking-widest leading-none mb-1">Gesture Identity</span>
+                            <span id="hud-label" class="text-xl font-medium tracking-tight leading-none">Open Hand</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Controls -->
+            <div class="flex items-center justify-between bg-[#111111] p-4 rounded-lg border border-white/5">
+                <div class="flex flex-col">
+                    <span class="text-[10px] text-gray-600 font-mono uppercase tracking-[0.2em] mb-1">Feed Status</span>
+                    <span id="stream-info" class="text-xs font-medium text-gray-500 italic">Standby Mode</span>
+                </div>
+                <div class="flex flex-col items-end gap-2">
+                    <div class="flex justify-between w-56 text-[9px] font-mono text-gray-500 uppercase tracking-tighter">
+                        <span>Precision Depth</span>
+                        <span id="precision-val">0%</span>
+                    </div>
+                    <div class="w-56 h-1 bg-white/5 rounded-full overflow-hidden">
+                        <div id="precision-bar" class="w-0 h-full bg-blue-900 transition-all duration-300"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar Rigth -->
+        <aside class="lg:col-span-4 bg-[#0D0D0D] border-l border-white/10 flex flex-col p-6 gap-6 overflow-y-auto custom-scrollbar">
+            <section>
+                <h3 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Geometric Telemetry</h3>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-[#111111] border border-white/5 p-3 rounded flex flex-col">
+                        <span class="text-[8px] font-bold text-gray-600 uppercase tracking-widest">Traversed</span>
+                        <span id="stat-detections" class="text-lg font-mono font-medium text-gray-300 leading-none py-1">000</span>
+                        <span class="text-[8px] text-blue-900 font-mono uppercase">Total Detections</span>
+                    </div>
+                    <div class="bg-[#111111] border border-white/5 p-3 rounded flex flex-col">
+                        <span class="text-[8px] font-bold text-gray-600 uppercase tracking-widest">Vertices</span>
+                        <span id="stat-vertices" class="text-lg font-mono font-medium text-gray-300 leading-none py-1">00</span>
+                        <span class="text-[8px] text-blue-900 font-mono uppercase">Calculated nodes</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="flex-1">
+                <h3 class="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] mb-4">Scene Graph (Gestures)</h3>
+                <div id="gesture-list" class="space-y-1">
+                    <!-- JS Generated -->
+                </div>
+            </section>
+
+            <section class="bg-blue-950/20 border border-blue-900/30 rounded-lg p-5 mt-auto">
+                <div class="flex flex-col gap-2">
+                    <span class="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Anatomy Scan</span>
+                    <p class="text-[10px] leading-relaxed text-blue-300/50 font-light lowercase tracking-tighter">
+                        Proprietary skeleton rigging meets standard mesh deformation for anatomical simulations.
+                    </p>
+                    <div class="flex gap-2 mt-2">
+                        <button class="flex-1 py-2 bg-blue-900 hover:bg-blue-800 text-white text-[10px] font-bold rounded uppercase tracking-widest transition-all">Symmetry Check</button>
+                    </div>
+                </div>
+            </section>
+        </aside>
+    </main>
+
+    <!-- Footer -->
+    <footer class="h-8 border-t border-white/10 bg-[#0A0A0A] px-6 flex items-center justify-between text-[10px] text-gray-600 font-mono uppercase tracking-tighter">
+        <span>Anatomical Model v2.4_PRO</span>
+        <div class="flex gap-6">
+            <span>X: 1.022</span>
+            <span>Y: -0.445</span>
+            <span class="text-blue-900">GPU: ACTIVATED</span>
+        </div>
+    </footer>
+
+    <!-- Scripts: MediaPipe -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+
+    <script>
+        const GESTURES = [
+            { id: "open", emoji: "✋", label: "Open Hand", desc: "Proximal expansion" },
+            { id: "fist", emoji: "✊", label: "Fist", desc: "Full curl compression" },
+            { id: "thumbsup", emoji: "👍", label: "Thumbs Up", desc: "Distal Pollex orientation" },
+            { id: "thumbsdown", emoji: "👎", label: "Thumbs Down", desc: "Negative Pollex axis" },
+            { id: "peace", emoji: "✌️", label: "Peace", desc: "Phalanx bifurcation" },
+            { id: "point", emoji: "☝️", label: "Pointing", desc: "Single axis vector" },
+            { id: "ok", emoji: "👌", label: "OK", desc: "Digital ring lock" },
+            { id: "rock", emoji: "🤘", label: "Rock On", desc: "Lateral bifurcation" },
+        ];
+
+        let gestureStats = {};
+        GESTURES.forEach(g => gestureStats[g.id] = 0);
+
+        // UI Build
+        const listEl = document.getElementById('gesture-list');
+        listEl.innerHTML = GESTURES.map(g => `
+            <div id="gesture-row-${g.id}" class="flex items-center gap-3 p-2 rounded border border-transparent hover:bg-white/5 transition-all text-gray-500">
+                <div class="w-8 h-8 rounded bg-[#111111] flex items-center justify-center text-lg grayscale opacity-50">${g.emoji}</div>
+                <div class="flex-1">
+                    <p class="text-[11px] font-medium leading-none mb-1 text-gray-400">${g.label}</p>
+                    <p class="text-[9px] font-mono lowercase truncate opacity-40">${g.desc}</p>
+                </div>
+                <span id="count-${g.id}" class="text-[10px] font-mono text-gray-800">000</span>
+            </div>
+        `).join('');
+
+        const video = document.getElementById('input-video');
+        const canvas = document.getElementById('output-canvas');
+        const ctx = canvas.getContext('2d');
+        const startBtn = document.getElementById('btn-start');
+
+        let hands = new Hands({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+
+        hands.setOptions({
+            maxNumHands: 2,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        function classifyGesture(lm) {
+            const fingerExtended = [false, false, false, false, false];
+            fingerExtended[0] = lm[4].y < lm[2].y;
+            fingerExtended[1] = lm[8].y < lm[6].y;
+            fingerExtended[2] = lm[12].y < lm[10].y;
+            fingerExtended[3] = lm[16].y < lm[14].y;
+            fingerExtended[4] = lm[20].y < lm[18].y;
+
+            const [thumb, idx, mid, ring, pinky] = fingerExtended;
+
+            if (thumb && !idx && !mid && !ring && !pinky && lm[4].y < lm[0].y - 0.05) return { id: "thumbsup", conf: 0.89 };
+            if (!thumb && !idx && !mid && !ring && !pinky && lm[4].y > lm[0].y + 0.05) return { id: "thumbsdown", conf: 0.84 };
+            if (!thumb && !idx && !mid && !ring && !pinky) return { id: "fist", conf: 0.93 };
+            if (thumb && idx && mid && ring && pinky) return { id: "open", conf: 0.96 };
+            if (!thumb && idx && mid && !ring && !pinky) return { id: "peace", conf: 0.91 };
+            if (!thumb && idx && !mid && !ring && !pinky) return { id: "point", conf: 0.88 };
+            if (!thumb && idx && !mid && !ring && pinky) return { id: "rock", conf: 0.86 };
+
+            const dist = Math.sqrt(Math.pow(lm[4].x - lm[8].x, 2) + Math.pow(lm[4].y - lm[8].y, 2));
+            if (dist < 0.07 && mid && ring && pinky) return { id: "ok", conf: 0.82 };
+            return null;
+        }
+
+        let frameCount = 0;
+        let lastTime = Date.now();
+        let lastId = null;
+
+        hands.onResults(results => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            frameCount++;
+            if (Date.now() - lastTime > 1000) {
+                document.getElementById('fps-counter').innerText = frameCount;
+                frameCount = 0;
+                lastTime = Date.now();
+            }
+
+            if (results.multiHandLandmarks) {
+                document.getElementById('stat-vertices').innerText = results.multiHandLandmarks.length * 21;
+                
+                results.multiHandLandmarks.forEach((landmarks, i) => {
+                    const isLeft = results.multiHandedness[i].label === 'Left';
+                    const color = isLeft ? '#3B82F6' : '#60A5FA';
+                    
+                    // Draw Skeleton
+                    drawConnectors(ctx, landmarks, HAND_CONNECTIONS, {color: '#37415188', lineWidth: 6});
+                    ctx.shadowBlur = 15; ctx.shadowColor = color;
+                    drawConnectors(ctx, landmarks, HAND_CONNECTIONS, {color: color, lineWidth: 3});
+                    ctx.shadowBlur = 0;
+
+                    landmarks.forEach((lm, idx) => {
+                        const isTip = [4,8,12,16,20].includes(idx);
+                        ctx.beginPath();
+                        ctx.arc(lm.x * canvas.width, lm.y * canvas.height, isTip ? 6 : 4, 0, 2 * Math.PI);
+                        ctx.fillStyle = isTip ? '#FFF' : '#1E3A8A';
+                        ctx.fill();
+                        ctx.strokeStyle = color;
+                        ctx.stroke();
+                    });
+
+                    if (i === 0) {
+                        const g = classifyGesture(landmarks);
+                        const hud = document.getElementById('gesture-hud');
+                        if (g) {
+                            const info = GESTURES.find(x => x.id === g.id);
+                            hud.style.opacity = 1;
+                            document.getElementById('hud-emoji').innerText = info.emoji;
+                            document.getElementById('hud-label').innerText = info.label;
+                            document.getElementById('precision-val').innerText = Math.round(g.conf * 100) + '%';
+                            document.getElementById('precision-bar').style.width = (g.conf * 100) + '%';
+                            
+                            if (g.id !== lastId) {
+                                gestureStats[g.id]++;
+                                document.getElementById('count-'+g.id).innerText = String(gestureStats[g.id]).padStart(3, '0');
+                                document.querySelectorAll('[id^="gesture-row-"]').forEach(r => r.classList.remove('bg-blue-900/20', 'border-blue-900/40', 'opacity-100'));
+                                const row = document.getElementById('gesture-row-'+g.id);
+                                row.classList.add('bg-blue-900/20', 'border-blue-900/40');
+                                row.querySelector('div').classList.remove('grayscale', 'opacity-50');
+                                lastId = g.id;
+                                document.getElementById('stat-detections').innerText = String(Object.values(gestureStats).reduce((a,b)=>a+b)).padStart(3, '0');
+                            }
+                        } else {
+                            hud.style.opacity = 0;
+                            document.getElementById('precision-bar').style.width = '0%';
+                        }
+                    }
+                });
+            } else {
+                document.getElementById('stat-vertices').innerText = '00';
+            }
+        });
+
+        const camera = new Camera(video, {
+            onFrame: async () => { await hands.send({image: video}); },
+            width: 1280, height: 720
+        });
+
+        startBtn.onclick = () => {
+            document.getElementById('init-overlay').classList.add('hidden');
+            document.getElementById('status-dot').classList.add('bg-green-500', 'shadow-[0_0_8px_rgba(34,197,94,0.5)]');
+            document.getElementById('status-text').innerText = 'GPU Rendering ACTIVE';
+            document.getElementById('stream-info').innerText = 'UV STREAM: ACTIVE_FEED_01';
+            camera.start();
+        };
+
+    </script>
+</body>
+</html>

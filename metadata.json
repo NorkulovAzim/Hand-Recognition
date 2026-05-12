@@ -1,0 +1,8 @@
+{
+  "name": "Hand Gesture Recon",
+  "description": "Real-time AI hand gesture recognition using MediaPipe and React. Features a high-tech dashboard interface and gesture classification.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": []
+}
